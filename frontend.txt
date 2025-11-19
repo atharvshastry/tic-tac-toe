@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tic Tac Toe - Bhai Edition</title>
+  
+  <!-- Ye pura CSS hai → sirf sundar banane ke liye, abhi skip kar sakta hai -->
+  <style> ... </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Tic Tac Toe</h1>
+    
+    <!-- Ye line batayegi kiski baari hai -->
+    <div class="status" id="status">X ki chali!</div>
+    
+    <!-- Ye 3×3 ka board hai jahan hum khelenge -->
+    <div class="board" id="board"></div>
+    
+    <!-- Jeetne ke baad yahan message aayega -->
+    <div class="winner" id="winner"></div>
+    
+    <!-- Naya game button -->
+    <button onclick="resetGame()">Naya Game</button>
+  </div>
+
+  <script>
+    // =================== SABSE ZAROORI CHEEZEN YAHAN SE SHURU ===================
+
+    // Ye teen jagah hum JavaScript se pakdenge
+    const board   = document.getElementById("board");    // pura 3x3 board
+    const status  = document.getElementById("status");   // "X ki chali" wali line
+    const winnerDiv = document.getElementById("winner"); // "X jeet gaya" wali line
+
+    let currentPlayer = "X";                 // shuru mein X ki baari
+    let gameState = [0,0,0,0,0,0,0,0,0];      // 0=khali, 1=X, -1=O  → tere backend jaisa hi
+    let gameActive = true;                   // game chal raha hai ya nahi
+
+    // Ye bata raha hai hamara FastAPI server kahan chal raha hai
+    const API_URL = "http://127.0.0.1:8000";
+    // Agar tu mobile se khelna chahe aur laptop pe server chal raha hai toh yahan laptop ka IP daal dena (jaise 192.168.x.x:8000)
+
+    // Pehli baar 9 khali boxes bana deta hai
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      cell.dataset.index = i;           // har box ko number diya 0-8
+      cell.addEventListener("click", handleCellClick);  // jab click hoga toh function chalega
+      board.appendChild(cell);
+    }
+
+    // YE SABSE MAST FUNCTION HAI → jab koi box pe click karega
+    function handleCellClick(e) {
+      const index = e.target.dataset.index;   // kaunsa box dabaya (0-8)
+      
+      // Agar pehle se bhara hai ya game khatam ho gaya → kuch mat kar
+      if (gameState[index] !== 0 || !gameActive) return;
+
+      // === YE SIRF DIKHAANE KE LIYE JALDI SE X/O DAAL Raha hoon ===
+      gameState[index] = currentPlayer === "X" ? 1 : -1;
+      e.target.textContent = currentPlayer;
+      e.target.classList.add(currentPlayer.toLowerCase());
+
+      // === AB ASLI KAAM → backend ko bol do move daalne ko ===
+      fetch(`${API_URL}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ position: parseInt(index) })   // "position": 5
+      })
+      .then(res => res.json())        // backend jo jawab dega usko padho
+      .then(data => {
+        // Backend ne jo latest board bheja usko dikhao
+        updateBoard(data.state);
+
+        // Agar koi jeet gaya ya draw ho gaya
+        if (data.winner !== null) {
+          if (data.winner === 1)  winnerDiv.textContent = "X jeet gaya!";
+          else if (data.winner === -1) winnerDiv.textContent = "O jeet gaya!";
+          else winnerDiv.textContent = "Draw ho gaya re!";
+          gameActive = false;
+          status.textContent = "Game Khatam!";
+        } else {
+          // Game abhi chal raha → baari badal do
+          currentPlayer = currentPlayer === "X" ? "O" : "X";
+          status.textContent = `${currentPlayer} ki chali!`;
+        }
+      })
+      .catch(err => {
+        alert("Bhai server band hai ya galat URL daala! uvicorn chala pehle!");
+      });
+    }
+
+    // Board ko latest state se update karne ka function
+    function updateBoard(state) {
+      gameState = state;
+      document.querySelectorAll(".cell").forEach((cell, i) => {
+        if (state[i] === 1) {
+          cell.textContent = "X";
+          cell.classList.add("x");
+        } else if (state[i] === -1) {
+          cell.textContent = "O";
+          cell.classList.add("o");
+        } else {
+          cell.textContent = "";
+          cell.classList.remove("x", "o");
+        }
+      });
+    }
+
+    // Jab "Naya Game" button dabega
+    function resetGame() {
+      fetch(`${API_URL}/reset`, { method: "POST" })
+        .then(() => location.reload())   // pura page refresh → sab saaf
+        .catch(() => location.reload());
+    }
+
+    // Page khulte hi backend se current board le lo
+    fetch(`${API_URL}/state`)
+      .then(res => res.json())
+      .then(data => {
+        updateBoard(data.state);
+        currentPlayer = data.turn === 1 ? "X" : "O";
+        status.textContent = `${currentPlayer} ki chali!`;
+      });
+  </script>
+</body>
+</html>

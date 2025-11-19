@@ -1,0 +1,96 @@
+# main.py – Pura code ek baar phir se (comments ke saath)
+
+from fastapi import FastAPI
+# ↑ Ye FastAPI library laata hai – jaise Django ya Flask hota hai na, usi tarah ka web framework
+
+from fastapi.middleware.cors import CORSMiddleware
+# ↑ Browser security ke wajah se frontend (HTML) aur backend (FastAPI) alag-alag port pe chalte hain.
+#   Bina iske browser bolega “nahi allowed bhai”. Ye permission deta hai.
+
+from pydantic import BaseModel
+# ↑ Ye data ko check karta hai jo frontend se aata hai (jaise position 0-8 ke beech hai ya nahi)
+
+from typing import List, Optional
+# ↑ Bas Python ko thoda smart banata hai, ignore kar sakta hai abhi
+
+# Ye hamara pura server hai – jaise ghar ka main darwaza
+app = FastAPI(title="Tic Tac Toe by Bhai")
+
+# Ye line sabse important hai – CORS permission de deta hai sabko
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # matlab koi bhi website connect kar sakti hai (local testing ke liye)
+    allow_methods=["*"],   # GET, POST, sab allow
+    allow_headers=["*"],
+)
+
+# Ye game ka board hai – tere purane code jaisa hi
+state = [0, 0, 0, 0, 0, 0, 0, 0, 0]   # 0 = khali, 1 = X, -1 = O
+turn = 1                               # 1 = X ki baari, 0 = O ki baari
+
+# Ye ek chhota sa rule book hai – frontend se jo data aayega uska format
+class MoveRequest(BaseModel):
+    position: int      # sirf ek number chahiye 0 se 8 tak
+
+# Jeet check karne ka function – bilkul tere purane code jaisa
+def check_winner() -> Optional[int]:
+    wins = [
+        [0,1,2], [3,4,5], [6,7,8],   # teeno rows
+        [0,3,6], [1,4,7], [2,5,8],   # teeno columns
+        [0,4,8], [2,4,6]             # dono diagonals
+    ]
+    for combo in wins:
+        a, b, c = combo[0], combo[1], combo[2]
+        if state[a] == state[b] == state[c] != 0:
+            return state[a]        # jo bhi jeeta uska number (1 ya -1) return kar dega
+    
+    if 0 not in state:            # board pura bhar gaya aur koi nahi jeeta
+        return 0                   # draw
+    
+    return None                   # abhi game chal raha hai
+
+# 1. Jab page khulega tab ye chalega – current board bhejega
+@app.get("/state")
+def get_state():
+    return {
+        "state": state,      # pura board
+        "turn": turn,        # kiski baari hai
+        "winner": check_winner()   # jeet gaya koi ya nahi
+    }
+
+# 2. Jab koi box pe click karega tab ye chalega
+@app.post("/move")
+def make_move(move: MoveRequest):
+    global turn                     # turn ko change karna hai isliye global bola
+    
+    pos = move.position             # frontend se jo number aaya
+    
+    # Galat move ko rok do
+    if pos < 0 or pos > 8:
+        return {"error": "0 se 8 ke beech number daal bhai"}
+    if state[pos] != 0:
+        return {"error": "Ye jagah pehle se bhari hai!"}
+    
+    # Sahi move hai toh daal do
+    state[pos] = 1 if turn == 1 else -1
+    
+    winner = check_winner()         # ab check karo jeet toh nahi gaya
+    
+    # Agar game khatam nahi hua toh baari badal do
+    if winner is None:
+        turn = 1 - turn             # 1 → 0, 0 → 1 (toggle)
+    
+    # Frontend ko nayi state bhej do
+    return {
+        "state": state.copy(),     # pura board bhejo
+        "turn": turn,              # ab kiski baari hai
+        "winner": winner           # None (chal raha), 1 (X jeeta), -1 (O jeeta), 0 (draw)
+    }
+
+# 3. Naya game button dabane pe ye chalega
+@app.post("/reset")
+def reset_game():
+    global state, turn
+    state = [0, 0, 0, 0, 0, 0, 0, 0, 0]   # board saaf
+    turn = 1                              # X se shuru
+    return {"message": "Naya game shuru ho gaya bhai!"}
