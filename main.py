@@ -64,4 +64,10 @@ def reset_game():
     state = [0, 0, 0, 0, 0, 0, 0, 0, 0]   # board saaf
     turn = 1                              # X se shuru
     return {"message": "Naya game shuru ho gaya bhai!"}
+@app.get("/")
+async def root():
+    global state, turn
+    state = [0] * 9    # ← har baar nayi game
+    turn = 1
+    return FileResponse("static/index.html")
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
