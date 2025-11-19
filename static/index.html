@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tic Tac Toe - Bhai Edition</title>
+  <title>Tic Tac Toe</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -23,7 +23,7 @@
       backdrop-filter: blur(10px);
       box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
-    h1 { margin-bottom: 20px; font-size: 2.5rem; }
+    h1 { margin-bottom: 20px; font-size: 2.8rem; }
     .board {
       display: grid;
       grid-template-columns: repeat(3, 100px);
@@ -42,17 +42,17 @@
       justify-content: center;
       cursor: pointer;
       transition: all 0.3s;
-      user-select: none;
     }
     .cell:hover { background: rgba(255,255,255,0.3); transform: scale(1.05); }
     .cell.x { color: #ff6b6b; }
     .cell.o { color: #4ecdc4; }
     .status {
-      font-size: 1.5rem;
+      font-size: 1.6rem;
       margin: 20px 0;
+      font-weight: 600;
     }
     button {
-      padding: 12px 30px;
+      padding: 12px 32px;
       font-size: 1.1rem;
       background: #fff;
       color: #764ba2;
@@ -61,26 +61,27 @@
       cursor: pointer;
       margin-top: 20px;
       transition: 0.3s;
+      font-weight: bold;
     }
     button:hover {
       background: #f0f0f0;
       transform: translateY(-3px);
     }
     .winner {
-      font-size: 2rem;
+      font-size: 2.2rem;
       margin: 20px 0;
       font-weight: bold;
-      text-shadow: 0 0 10px rgba(255,255,255,0.8);
+      text-shadow: 0 0 15px rgba(255,255,255,0.8);
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Tic Tac Toe</h1>
-    <div class="status" id="status">X ki chali!</div>
+    <div class="status" id="status">X's turn!</div>
     <div class="board" id="board"></div>
     <div class="winner" id="winner"></div>
-    <button onclick="resetGame()">Naya Game</button>
+    <button onclick="resetGame()">New Game</button>
   </div>
 
   <script>
@@ -88,13 +89,12 @@
     const status = document.getElementById("status");
     const winnerDiv = document.getElementById("winner");
     let currentPlayer = "X";
-    let gameState = [0,0,0,0,0,0,0,0,0]; // 0=empty, 1=X, -1=O
+    let gameState = [0,0,0,0,0,0,0,0,0];
     let gameActive = true;
 
-    // FastAPI backend URL (change if needed)
-    const API_URL = "";
+    const API_URL = "";  // same domain pe hai isliye khali
 
-    // Create board
+    // Create 9 cells
     for (let i = 0; i < 9; i++) {
       const cell = document.createElement("div");
       cell.classList.add("cell");
@@ -107,12 +107,10 @@
       const index = e.target.dataset.index;
       if (gameState[index] !== 0 || !gameActive) return;
 
-      // Optimistic UI update
       gameState[index] = currentPlayer === "X" ? 1 : -1;
       e.target.textContent = currentPlayer;
       e.target.classList.add(currentPlayer.toLowerCase());
 
-      // Send move to backend
       fetch(`${API_URL}/move`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,58 +119,41 @@
       .then(res => res.json())
       .then(data => {
         updateBoard(data.state);
+
         if (data.winner !== null) {
-          endGame(data.winner);
+          gameActive = false;
+          if (data.winner === 1) winnerDiv.textContent = "X wins!";
+          else if (data.winner === -1) winnerDiv.textContent = "O wins!";
+          else winnerDiv.textContent = "It's a draw!";
+          status.textContent = "Game Over";
         } else {
           currentPlayer = currentPlayer === "X" ? "O" : "X";
-          status.textContent = `${currentPlayer} ki chance`;
+          status.textContent = `${currentPlayer}'s turn!`;
         }
-      })
-      .catch(err => {
-        console.error(err);
-        alert("Backend se connection nahi ho raha bhai! FastAPI start kar na!");
-        resetGame();
       });
     }
 
     function updateBoard(state) {
       gameState = state;
       document.querySelectorAll(".cell").forEach((cell, i) => {
-        if (state[i] === 1) {
-          cell.textContent = "X";
-          cell.classList.add("x");
-        } else if (state[i] === -1) {
-          cell.textContent = "O";
-          cell.classList.add("o");
-        }
+        if (state[i] === 1) { cell.textContent = "X"; cell.classList.add("x"); }
+        else if (state[i] === -1) { cell.textContent = "O"; cell.classList.add("o"); }
+        else { cell.textContent = ""; cell.classList.remove("x", "o"); }
       });
-    }
-
-    function endGame(winner) {
-      gameActive = false;
-      if (winner === 1) {
-        winnerDiv.textContent = "X jeet gaya!";
-      } else if (winner === -1) {
-        winnerDiv.textContent = "O jeet gaya!";
-      } else {
-        winnerDiv.textContent = "Draw ho gaya, koi nahi jeeta!";
-      }
-      status.textContent = "Game over!";
     }
 
     function resetGame() {
       fetch(`${API_URL}/reset`, { method: "POST" })
-        .then(() => location.reload())
-        .catch(() => location.reload());
+        .then(() => location.reload());
     }
 
-    // Load initial state on start
+    // Load initial state
     fetch(`${API_URL}/state`)
       .then(res => res.json())
       .then(data => {
         updateBoard(data.state);
         currentPlayer = data.turn === 1 ? "X" : "O";
-        status.textContent = `${currentPlayer} ki chance`;
+        status.textContent = `${currentPlayer}'s turn!`;
       });
   </script>
 </body>
