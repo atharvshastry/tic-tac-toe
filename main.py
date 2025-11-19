@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional #optional
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+import os
 
 app = FastAPI(title="Tic Tac Toe by Bhai")
 
@@ -58,16 +59,18 @@ def make_move(move: MoveRequest):
         "turn": turn,
         "winner": winner
     }
-@app.post("/reset")
-def reset_game():
-    global state, turn
-    state = [0, 0, 0, 0, 0, 0, 0, 0, 0]   # board saaf
-    turn = 1                              # X se shuru
-    return {"message": "Naya game shuru ho gaya bhai!"}
+
 @app.get("/")
 async def root():
     global state, turn
-    state = [0] * 9    # ← har baar nayi game
-    turn = 1
+    state = [0] * 9        # ← har baar blank board
+    turn = 1               # ← X ki turn
     return FileResponse("static/index.html")
+
+@app.get("/reset")
+async def reset_game():
+    global state, turn
+    state = [0] * 9
+    turn = 1
+    return {"success": True}
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
